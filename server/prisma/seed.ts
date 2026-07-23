@@ -78,6 +78,20 @@ async function main() {
   });
   console.log(`  ✅ Piquera creada: ${piquera.name}`);
 
+  // Crear super administrador global
+  const superAdminPassword = await bcrypt.hash('super123', 10);
+  const superAdmin = await prisma.user.upsert({
+    where: { email: 'superadmin@piqueralink.com' },
+    update: {},
+    create: {
+      name: 'Super Administrador',
+      email: 'superadmin@piqueralink.com',
+      passwordHash: superAdminPassword,
+      role: 'super_admin' as Role,
+    },
+  });
+  console.log(`  ✅ Super Admin creado: ${superAdmin.email}`);
+
   console.log('\n🎉 Seed completado exitosamente.');
 }
 
