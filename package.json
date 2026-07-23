@@ -1,27 +1,26 @@
 {
-  "name": "piqueralink-client",
+  "name": "piqueralink",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
+  "description": "Sistema Web de Gestión de Piqueras y Pasajeros",
+  "workspaces": [
+    "server",
+    "client",
+    "shared"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0",
-    "socket.io-client": "^4.8.0"
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build:server": "npm run build --workspace=server",
+    "build:client": "npm run build --workspace=client",
+    "db:migrate": "npm run db:migrate --workspace=server",
+    "db:seed": "npm run db:seed --workspace=server",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\""
   },
   "devDependencies": {
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.41",
-    "tailwindcss": "^3.4.10",
-    "typescript": "^5.6.0",
-    "vite": "^5.4.2"
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
