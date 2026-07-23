@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: piqueralink-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-piqueralink}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-piqueralink_dev}
+      POSTGRES_DB: ${DB_NAME:-piqueralink}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-piqueralink}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
