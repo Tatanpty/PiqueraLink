@@ -7,6 +7,9 @@ import {
   emitTripStatusChanged,
 } from './trips.events';
 import { emitQueueStateChanged } from '../queue/queue.events';
+import { walletService } from '../wallet/wallet.service';
+import { fareCalculator } from '../payments/fare.calculator';
+import { promosService } from '../promos/promos.service';
 
 export class TripsService {
   /**
@@ -67,7 +70,32 @@ export class TripsService {
         );
       }
 
-      // Crear solicitud de viaje con conductor asignado
+      // Calcular tarifa upfront
+      const fareBreakdown = await fareCalculator.calculateUpfrontFare({
+        originLat: data.originLat,
+        originLng: data.originLng,
+        destinationLat: data.destinationLat,
+        destinationLng: data.destinationLng,
+        piqueraId: data.piqueraId,
+      });
+
+      let finalFare = fareBreakdown.totalFare;
+
+      // Aplicar código promo si existe
+      let promoDiscount = 0;
+      if (data.promoCode) {
+        const promoResult = await promosService.applyPromoCode(
+          data.promoCode,
+          passengerId,
+          finalFare
+        );
+        if (promoResult) {
+          promoDiscount = promoResult.discount;
+          finalFare = Math.round((finalFare - promoDiscount) * 100) / 100;
+        }
+      }
+
+      // Crear solicitud de viaje con conductor asignado y tarifa
       const trip = await tx.tripRequest.create({
         data: {
           passengerId,
@@ -76,6 +104,8 @@ export class TripsService {
           originLat: data.originLat,
           originLng: data.originLng,
           destination: data.destination,
+          fareAmount: finalFare,
+          fareBreakdown: { ...fareBreakdown, promoDiscount },
           status: TripStatus.assigned,
           assignedAt: new Date(),
         },
@@ -339,6 +369,9 @@ export class TripsService {
         status: 'completed',
         timestamp: new Date().toISOString(),
       });
+
+      // Acreditar ganancias al conductor automáticamente
+      await walletService.creditTripEarning(driverId, tripId, trip.piqueraId);
 
       return updated;
     });

@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PassengerHome } from './pages/PassengerHome';
 import { DriverDashboard } from './pages/DriverDashboard';
 import { AdminPanel } from './pages/AdminPanel';
+import { GlobalAdminPanel } from './pages/GlobalAdminPanel';
 
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuthContext();
@@ -37,6 +38,7 @@ function AppContent() {
       {user.role === 'passenger' && <PassengerHome />}
       {user.role === 'driver' && <DriverDashboard />}
       {user.role === 'admin' && <AdminPanel />}
+      {user.role === 'super_admin' && <GlobalAdminPanel />}
     </SocketProvider>
   );
 }

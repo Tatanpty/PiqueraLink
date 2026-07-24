@@ -87,10 +87,34 @@ export const tripsApi = {
 // Piqueras
 export const piquerasApi = {
   getAll: (token: string) =>
-    request<any>('/piqueras', { token }),
+    request<any[]>('/piqueras', { token }),
 
   getNearby: (lat: number, lng: number, token: string) =>
-    request<any>(`/piqueras/nearby?lat=${lat}&lng=${lng}`, { token }),
+    request<any[]>(`/piqueras/nearby?lat=${lat}&lng=${lng}`, { token }),
+
+  getNearest: (lat: number, lng: number, token: string) =>
+    request<any>(`/piqueras/nearest?lat=${lat}&lng=${lng}`, { token }),
+
+  getMetrics: (piqueraId: string, token: string) =>
+    request<any>(`/piqueras/${piqueraId}/metrics`, { token }),
+};
+
+// Global Admin
+export const globalAdminApi = {
+  getOverview: (token: string) =>
+    request<any>('/global-admin/overview', { token }),
+
+  getAllPiqueras: (token: string) =>
+    request<any[]>('/global-admin/piqueras', { token }),
+
+  getPiqueraDetail: (piqueraId: string, token: string) =>
+    request<any>(`/global-admin/piqueras/${piqueraId}`, { token }),
+};
+
+// Metrics
+export const metricsApi = {
+  getGlobal: (token: string) =>
+    request<any>('/admin/metrics/global', { token }),
 };
 
 export { ApiError };

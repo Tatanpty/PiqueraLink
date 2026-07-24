@@ -18,6 +18,7 @@ enum Role {
   passenger
   driver
   admin
+  super_admin
 }
 
 enum TurnStatus {
@@ -35,37 +36,112 @@ enum TripStatus {
   cancelled
 }
 
+enum SOSType {
+  panic
+  accident
+  robbery
+  medical
+  other
+}
+
+enum SOSStatus {
+  active
+  acknowledged
+  resolved
+  false_alarm
+}
+
+enum LostItemStatus {
+  pending
+  returned
+  closed
+}
+
+enum TransactionType {
+  trip_earning
+  commission_platform
+  commission_piquera
+  withdrawal
+  top_up
+  refund
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum AccountStatus {
+  active
+  suspended
+  banned
+}
+
+enum DiscountType {
+  percentage
+  fixed
+}
+
+enum NotificationType {
+  trip_update
+  queue_update
+  promo
+  sos
+  system
+}
+}
+
 // ========================
 // Modelos
 // ========================
 
 model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         Role
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  passwordHash    String        @map("password_hash")
+  role            Role
+  accountStatus   AccountStatus @default(active) @map("account_status")
+  profilePhotoUrl String?       @map("profile_photo_url")
+  ratingAverage   Float         @default(0) @map("rating_average")
+  ratingCount     Int           @default(0) @map("rating_count")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  vehicle         Vehicle?
-  turns           Turn[]
-  tripAsPassenger TripRequest[] @relation("PassengerTrips")
-  tripAsDriver    TripRequest[] @relation("DriverTrips")
-  incidents       Incident[]    @relation("AdminIncidents")
-  driverIncidents Incident[]    @relation("DriverIncidents")
+  vehicle            Vehicle?
+  turns              Turn[]
+  tripAsPassenger    TripRequest[]      @relation("PassengerTrips")
+  tripAsDriver       TripRequest[]      @relation("DriverTrips")
+  incidents          Incident[]         @relation("AdminIncidents")
+  driverIncidents    Incident[]         @relation("DriverIncidents")
+  driverLocation     DriverLocation?
+  sosAlerts          SOSAlert[]         @relation("UserSOS")
+  resolvedSosAlerts  SOSAlert[]         @relation("ResolverSOS")
+  emergencyContacts  EmergencyContact[]
+  reviewsGiven       Review[]           @relation("ReviewAuthor")
+  reviewsReceived    Review[]           @relation("ReviewTarget")
+  favoriteLocations  FavoriteLocation[]
+  lostItems          LostItem[]
+  wallet             Wallet?
+  transactions       Transaction[]
+  notifications      Notification[]
+  promoRedemptions   PromoRedemption[]
 
   @@map("users")
 }
 
 model Vehicle {
-  id        String   @id @default(uuid())
-  driverId  String   @unique @map("driver_id")
-  plate     String   @unique
-  model     String
-  color     String
-  photoUrl  String   @map("photo_url")
-  createdAt DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  driverId       String   @unique @map("driver_id")
+  plate          String   @unique
+  model          String
+  color          String
+  photoUrl       String   @map("photo_url")
+  photoFrontUrl  String?  @map("photo_front_url")
+  photoRearUrl   String?  @map("photo_rear_url")
+  photoInteriorUrl String? @map("photo_interior_url")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   driver    User       @relation(fields: [driverId], references: [id])
   incidents Incident[]
@@ -85,6 +161,7 @@ model Piquera {
 
   turns        Turn[]
   tripRequests TripRequest[]
+  commissionRule CommissionRule?
 
   @@map("piqueras")
 }
@@ -107,21 +184,27 @@ model Turn {
 }
 
 model TripRequest {
-  id          String     @id @default(uuid())
-  passengerId String     @map("passenger_id")
-  driverId    String?    @map("driver_id")
-  piqueraId   String     @map("piquera_id")
-  originLat   Decimal    @map("origin_lat")
-  originLng   Decimal    @map("origin_lng")
-  destination String
-  status      TripStatus @default(pending)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  assignedAt  DateTime?  @map("assigned_at")
-  completedAt DateTime?  @map("completed_at")
+  id            String     @id @default(uuid())
+  passengerId   String     @map("passenger_id")
+  driverId      String?    @map("driver_id")
+  piqueraId     String     @map("piquera_id")
+  originLat     Decimal    @map("origin_lat")
+  originLng     Decimal    @map("origin_lng")
+  destination   String
+  fareAmount    Decimal?   @map("fare_amount")
+  fareBreakdown Json?      @map("fare_breakdown")
+  status        TripStatus @default(pending)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  assignedAt    DateTime?  @map("assigned_at")
+  completedAt   DateTime?  @map("completed_at")
 
-  passenger User    @relation("PassengerTrips", fields: [passengerId], references: [id])
-  driver    User?   @relation("DriverTrips", fields: [driverId], references: [id])
-  piquera   Piquera @relation(fields: [piqueraId], references: [id])
+  passenger User      @relation("PassengerTrips", fields: [passengerId], references: [id])
+  driver    User?     @relation("DriverTrips", fields: [driverId], references: [id])
+  piquera   Piquera   @relation(fields: [piqueraId], references: [id])
+  sosAlerts SOSAlert[]
+  reviews   Review[]
+  shareTokens TripShareToken[]
+  lostItems   LostItem[]
 
   @@index([piqueraId, status])
   @@index([passengerId, status])
@@ -141,4 +224,253 @@ model Incident {
   vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
 
   @@map("incidents")
+}
+
+// ========================
+// Fase 1: Geolocalización de Conductores
+// ========================
+
+model DriverLocation {
+  id        String   @id @default(uuid())
+  driverId  String   @unique @map("driver_id")
+  latitude  Decimal
+  longitude Decimal
+  heading   Float?
+  speed     Float?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  driver User @relation(fields: [driverId], references: [id])
+
+  @@index([latitude, longitude])
+  @@map("driver_locations")
+}
+
+model TrafficZone {
+  id              String   @id @default(uuid())
+  name            String
+  polygonGeoJson  Json     @map("polygon_geojson")
+  congestionLevel Int      @default(1) @map("congestion_level")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("traffic_zones")
+}
+
+// ========================
+// Fase 3: Sistema SOS
+// ========================
+
+model SOSAlert {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  tripId      String?   @map("trip_id")
+  latitude    Decimal
+  longitude   Decimal
+  type        SOSType
+  status      SOSStatus @default(active)
+  description String?
+  resolvedBy  String?   @map("resolved_by")
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user     User         @relation("UserSOS", fields: [userId], references: [id])
+  trip     TripRequest? @relation(fields: [tripId], references: [id])
+  resolver User?        @relation("ResolverSOS", fields: [resolvedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@map("sos_alerts")
+}
+
+model EmergencyContact {
+  id           String @id @default(uuid())
+  userId       String @map("user_id")
+  name         String
+  phone        String
+  relationship String
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("emergency_contacts")
+}
+
+// ========================
+// Calificaciones y Reputación
+// ========================
+
+model Review {
+  id         String   @id @default(uuid())
+  tripId     String   @map("trip_id")
+  authorId   String   @map("author_id")
+  targetId   String   @map("target_id")
+  rating     Int      // 1-5
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  trip   TripRequest @relation(fields: [tripId], references: [id])
+  author User        @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target User        @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  @@unique([tripId, authorId]) // Solo una review por autor por viaje
+  @@index([targetId, createdAt])
+  @@map("reviews")
+}
+
+// ========================
+// Destinos Favoritos
+// ========================
+
+model FavoriteLocation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String   // "Casa", "Trabajo", etc.
+  address   String
+  latitude  Decimal
+  longitude Decimal
+  icon      String?  @default("📍")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("favorite_locations")
+}
+
+// ========================
+// Compartir Viaje (Safety Link)
+// ========================
+
+model TripShareToken {
+  id        String    @id @default(uuid())
+  tripId    String    @map("trip_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  trip TripRequest @relation(fields: [tripId], references: [id])
+
+  @@index([token])
+  @@map("trip_share_tokens")
+}
+
+// ========================
+// Objetos Perdidos
+// ========================
+
+model LostItem {
+  id          String         @id @default(uuid())
+  tripId      String         @map("trip_id")
+  userId      String         @map("user_id")
+  description String
+  status      LostItemStatus @default(pending)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  trip TripRequest @relation(fields: [tripId], references: [id])
+  user User        @relation(fields: [userId], references: [id])
+
+  @@index([tripId])
+  @@index([status])
+  @@map("lost_items")
+}
+
+// ========================
+// Billetera y Transacciones
+// ========================
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  balance   Decimal  @default(0)
+  currency  String   @default("USD")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id          String            @id @default(uuid())
+  userId      String            @map("user_id")
+  tripId      String?           @map("trip_id")
+  type        TransactionType
+  amount      Decimal
+  description String?
+  status      TransactionStatus @default(completed)
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+  @@map("transactions")
+}
+
+model CommissionRule {
+  id          String  @id @default(uuid())
+  piqueraId   String? @unique @map("piquera_id")
+  platformPct Decimal @default(10) @map("platform_pct")
+  piqueraPct  Decimal @default(5) @map("piquera_pct")
+  driverPct   Decimal @default(85) @map("driver_pct")
+
+  piquera Piquera? @relation(fields: [piqueraId], references: [id])
+
+  @@map("commission_rules")
+}
+
+// ========================
+// Códigos Promocionales
+// ========================
+
+model PromoCode {
+  id           String       @id @default(uuid())
+  code         String       @unique
+  discountType DiscountType @map("discount_type")
+  value        Decimal      // Porcentaje (ej: 20) o monto fijo (ej: 5.00)
+  usageLimit   Int          @default(100) @map("usage_limit")
+  usageCount   Int          @default(0) @map("usage_count")
+  minFare      Decimal?     @map("min_fare") // Tarifa mínima para aplicar
+  maxDiscount  Decimal?     @map("max_discount") // Tope de descuento en USD
+  isActive     Boolean      @default(true) @map("is_active")
+  expiresAt    DateTime     @map("expires_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  redemptions PromoRedemption[]
+
+  @@index([code, isActive])
+  @@map("promo_codes")
+}
+
+model PromoRedemption {
+  id          String   @id @default(uuid())
+  promoCodeId String   @map("promo_code_id")
+  userId      String   @map("user_id")
+  tripId      String?  @map("trip_id")
+  discount    Decimal
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([promoCodeId, userId]) // Un usuario solo puede usar un código una vez
+  @@map("promo_redemptions")
+}
+
+// ========================
+// Notificaciones
+// ========================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
