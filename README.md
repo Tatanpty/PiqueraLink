@@ -1,83 +1,94 @@
 # 🚕 PiqueraLink
 
-**Sistema Web de Gestión de Piqueras y Pasajeros**
+**Plataforma Inteligente de Movilidad para Piqueras de Taxis**
 
-PiqueraLink moderniza las piqueras de taxis tradicionales, digitalizando la gestión de colas (turnos FIFO), la asignación de conductores y la solicitud de viajes por parte de pasajeros — todo en tiempo real.
+PiqueraLink moderniza las piqueras de taxis tradicionales con un sistema digital completo: gestión de colas FIFO, asignación inteligente de conductores, tarificación dinámica, pagos digitales, seguridad SOS en tiempo real y analítica predictiva.
 
 ---
 
 ## 📋 Tabla de Contenidos
 
 - [Problema que resuelve](#-problema-que-resuelve)
-- [Características principales](#-características-principales)
+- [Características](#-características)
 - [Arquitectura](#-arquitectura)
 - [Stack Tecnológico](#-stack-tecnológico)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Requisitos Previos](#-requisitos-previos)
 - [Instalación y Ejecución](#-instalación-y-ejecución)
-- [Guía de Pruebas](#-guía-de-pruebas)
+- [Módulos del Sistema](#-módulos-del-sistema)
 - [API Endpoints](#-api-endpoints)
 - [Eventos en Tiempo Real](#-eventos-en-tiempo-real)
+- [Guía de Pruebas](#-guía-de-pruebas)
 - [Seguridad](#-seguridad)
-- [Equipo](#-equipo)
+- [Roadmap](#-roadmap)
 
 ---
 
 ## 🎯 Problema que resuelve
 
-En muchas ciudades, las piqueras de taxis funcionan de forma manual: el checador anota en papel, los pasajeros no saben cuántos taxis hay disponibles, y no existe trazabilidad del servicio. PiqueraLink elimina estos problemas ofreciendo:
+Las piqueras de taxis funcionan de forma manual: el checador anota en papel, los pasajeros desconocen la disponibilidad, y no hay trazabilidad. PiqueraLink elimina esto ofreciendo:
 
-- **Para pasajeros:** Una vista móvil rápida para solicitar un taxi y ver en tiempo real quién viene a buscarlos (placa, modelo, foto del conductor).
-- **Para conductores:** Un sistema de turnos digital y justo (FIFO) donde reciben asignaciones automáticas sin favoritismos.
-- **Para administradores/checadores:** Un panel en vivo para supervisar la fila virtual, gestionar incidencias y controlar la piquera.
+- **Pasajeros:** Vista móvil para pedir taxi, ver conductor asignado en tiempo real, compartir viaje con familiares, calificar servicio.
+- **Conductores:** Sistema de turnos digital FIFO, alertas de viajes, billetera con ganancias, analíticas de rendimiento.
+- **Administradores:** Panel en vivo de la cola, control de flota, reportes, gestión de sanciones.
+- **Super Admin:** Dashboard global con métricas de toda la red, salud operativa, alertas SOS centralizadas.
 
 ---
 
-## ✨ Características principales
+## ✨ Características
 
+### Core
 | Funcionalidad | Descripción |
 |---------------|-------------|
-| 🔐 Autenticación JWT | Registro y login seguro con roles (pasajero, conductor, admin) |
-| 📋 Cola FIFO | Gestión atómica de turnos con transacciones ACID |
-| 🚗 Asignación automática | El primer conductor en la cola es asignado al pasajero |
-| ⚡ Tiempo real | Socket.IO para actualizaciones instantáneas de cola y viajes |
-| 📍 Geolocalización | Ubicación del pasajero vía Geolocation API del navegador |
-| 📱 Mobile-first | Interfaz responsive optimizada para smartphones |
-| 🛡️ RBAC | Control de acceso por roles en cada endpoint |
-| ✅ Validación | Schemas Zod en backend, validación en frontend |
+| 🔐 Auth JWT + RBAC | 4 roles: pasajero, conductor, admin, super_admin |
+| 📋 Cola FIFO | Turnos atómicos con transacciones ACID |
+| 🚗 Asignación automática | Primer conductor en cola asignado al pasajero |
+| ⚡ Tiempo real | Socket.IO con rooms segmentadas por piquera/usuario/viaje |
+| 📍 Geolocalización | Ubicación del pasajero + tracking GPS del conductor |
+| 📱 Mobile-first | UI responsive optimizada para smartphones |
+
+### Avanzado
+| Funcionalidad | Descripción |
+|---------------|-------------|
+| 💰 Tarificación dinámica | Upfront pricing con surge por hora pico, tráfico y demanda |
+| 💳 Billetera digital | Split automático de pagos (85% conductor, 10% plataforma, 5% piquera) |
+| 🛡️ SOS en tiempo real | Botón de pánico con streaming de ubicación a admins |
+| ⭐ Calificaciones mutuas | Rating 1-5 entre pasajero y conductor |
+| 🔗 Compartir viaje | Safety link tokenizado para familiares (sin login) |
+| 🎫 Códigos promo | Descuentos por porcentaje o monto fijo con validación |
+| 📊 Analítica global | KPIs, métricas por piquera, predicción de demanda |
+| 📦 Objetos perdidos | Reportes con notificación al conductor |
+| 🔔 Notificaciones | Push vía Socket.IO con persistencia en DB |
+| 🚫 Sanciones | Suspensión/bloqueo de cuentas con invalidación inmediata |
+| 📄 Reportes CSV | Exportación de datos filtrados por fecha y piquera |
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    CLIENTE (Browser)                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │ Pasajero │  │Conductor │  │ Admin/Checador   │  │
-│  │  (React) │  │  (React) │  │     (React)      │  │
-│  └────┬─────┘  └────┬─────┘  └───────┬──────────┘  │
-│       │              │                │              │
-│       └──────────────┼────────────────┘              │
+┌──────────────────────────────────────────────────────┐
+│              CLIENTE (React + Tailwind)                │
+│  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌──────┐ │
+│  │ Pasajero │  │Conductor │  │  Admin  │  │Global│ │
+│  └────┬─────┘  └────┬─────┘  └────┬────┘  └──┬───┘ │
+│       └──────────────┼─────────────┼──────────┘     │
 │                      │ HTTP + WebSocket               │
 └──────────────────────┼───────────────────────────────┘
                        │
 ┌──────────────────────┼───────────────────────────────┐
-│               SERVIDOR (Node.js/Express)              │
-│                      │                                │
-│  ┌───────────────────┼──────────────────────────┐    │
-│  │           API REST + Socket.IO                │    │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────────┐   │    │
-│  │  │ Auth │ │Queue │ │Trips │ │  Admin   │   │    │
-│  │  └──┬───┘ └──┬───┘ └──┬───┘ └────┬─────┘   │    │
-│  │     └────────┼────────┼──────────┘           │    │
-│  │              │ Prisma ORM                     │    │
-│  └──────────────┼────────────────────────────────┘    │
-│                 │                                      │
-└─────────────────┼──────────────────────────────────────┘
-                  │
-┌─────────────────┼──────────────────────────────────────┐
-│          PostgreSQL 16 (Docker)                         │
+│          SERVIDOR (Node.js + Express + TypeScript)     │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │  16 módulos REST + 6 módulos Socket.IO           │ │
+│  │  Auth │ Queue │ Trips │ Piqueras │ SOS │ Wallet │ │
+│  │  Ratings │ Promos │ Notifications │ Location    │ │
+│  │  Favorites │ LostItems │ Analytics │ Reports    │ │
+│  └──────────────────────┬──────────────────────────┘ │
+│                         │ Prisma ORM                   │
+└─────────────────────────┼─────────────────────────────┘
+                          │
+┌─────────────────────────┼─────────────────────────────┐
+│             PostgreSQL 16 (Docker)                      │
+│  18 tablas │ 10 enums │ Transacciones ACID             │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -90,10 +101,10 @@ En muchas ciudades, las piqueras de taxis funcionan de forma manual: el checador
 | Frontend | React 18 + TypeScript + Vite + Tailwind CSS |
 | Backend | Node.js + Express + TypeScript |
 | Base de Datos | PostgreSQL 16 |
-| ORM | Prisma |
-| Tiempo Real | Socket.IO |
-| Autenticación | JWT + bcrypt |
-| Validación | Zod |
+| ORM | Prisma (18 modelos, migraciones declarativas) |
+| Tiempo Real | Socket.IO (6 módulos, 5 rooms) |
+| Autenticación | JWT + bcrypt + RBAC |
+| Validación | Zod (schemas en todos los endpoints) |
 | Contenedores | Docker + Docker Compose |
 
 ---
@@ -102,183 +113,191 @@ En muchas ciudades, las piqueras de taxis funcionan de forma manual: el checador
 
 ```
 piqueralink/
-├── client/                    # Frontend React
+├── client/                          # Frontend React
 │   ├── src/
-│   │   ├── context/          # AuthContext, SocketContext
-│   │   ├── hooks/            # useAuth, useSocket, useGeolocation
-│   │   ├── pages/            # Vistas por rol
-│   │   ├── services/         # Cliente API HTTP
-│   │   ├── App.tsx           # Enrutamiento por rol
-│   │   └── main.tsx          # Entry point
+│   │   ├── components/common/       # Sidebar, MetricCard, StatusBadge, AppLayout
+│   │   ├── context/                 # AuthContext, SocketContext
+│   │   ├── hooks/                   # useAuth, useSocket, useGeolocation
+│   │   ├── pages/                   # PassengerHome, DriverDashboard, AdminPanel, GlobalAdminPanel
+│   │   ├── services/api.ts          # Cliente HTTP tipado
+│   │   └── App.tsx                  # Routing por rol
 │   ├── tailwind.config.ts
 │   └── vite.config.ts
 │
-├── server/                    # Backend Express
+├── server/                          # Backend Express
 │   ├── src/
 │   │   ├── modules/
-│   │   │   ├── auth/         # Registro, Login, JWT
-│   │   │   ├── queue/        # Cola FIFO con Socket.IO
-│   │   │   └── trips/        # Solicitudes de viaje
-│   │   ├── middleware/       # authenticate, authorize, errorHandler
-│   │   ├── config/           # env.ts (Zod), database.ts (Prisma)
-│   │   ├── utils/            # geo.ts, token.ts
-│   │   └── app.ts            # Entry point
+│   │   │   ├── auth/                # Registro, Login, JWT, Refresh
+│   │   │   ├── queue/               # Cola FIFO + Socket.IO events
+│   │   │   ├── trips/               # Solicitudes + asignación + fare calc
+│   │   │   ├── piqueras/            # CRUD + geolocalización + métricas
+│   │   │   ├── global-admin/        # Dashboard global super_admin
+│   │   │   ├── metrics/             # Métricas globales y por piquera
+│   │   │   ├── geospatial/          # Tracking GPS de conductores
+│   │   │   ├── sos/                 # Alertas de emergencia en tiempo real
+│   │   │   ├── ratings/             # Calificaciones mutuas
+│   │   │   ├── favorites/           # Destinos favoritos del pasajero
+│   │   │   ├── trip-share/          # Safety link tokenizado
+│   │   │   ├── lost-items/          # Objetos perdidos
+│   │   │   ├── wallet/              # Billetera + transacciones + retiros
+│   │   │   ├── payments/            # Fare calculator dinámico
+│   │   │   ├── promos/              # Códigos promocionales
+│   │   │   ├── notifications/       # Push notifications vía Socket.IO
+│   │   │   ├── driver-analytics/    # Estadísticas del conductor
+│   │   │   └── admin-tools/         # Reportes + sanciones
+│   │   ├── middleware/              # authenticate, authorize, errorHandler
+│   │   ├── config/                  # env.ts (Zod), database.ts (Prisma)
+│   │   ├── utils/                   # geo.ts (Haversine), token.ts
+│   │   └── app.ts                   # Entry point (16 routers + 6 Socket.IO inits)
 │   └── prisma/
-│       ├── schema.prisma     # 6 modelos, 3 enums
-│       └── seed.ts           # Datos iniciales
+│       ├── schema.prisma            # 18 modelos, 10 enums
+│       └── seed.ts                  # Datos de prueba
 │
-├── shared/                    # Tipos TypeScript compartidos
-├── .env.example              # Variables de entorno documentadas
-├── docker-compose.yml        # PostgreSQL para desarrollo
-└── package.json              # Monorepo (npm workspaces)
+├── shared/                          # Tipos TypeScript compartidos
+├── .env.example                     # Variables de entorno (NUNCA secretos reales)
+├── .gitignore
+├── docker-compose.yml               # PostgreSQL 16
+└── package.json                     # Monorepo (npm workspaces)
 ```
-
----
-
-## 📦 Requisitos Previos
-
-- **Node.js** >= 18.x
-- **npm** >= 9.x
-- **Docker** y **Docker Compose** (para PostgreSQL)
-- Un navegador moderno con soporte de Geolocalización
 
 ---
 
 ## 🚀 Instalación y Ejecución
 
-### 1. Clonar el repositorio
+### Requisitos
+- Node.js >= 18
+- Docker & Docker Compose (para PostgreSQL)
+
+### Pasos
 
 ```bash
+# 1. Clonar
 git clone https://github.com/tu-usuario/piqueralink.git
 cd piqueralink
-```
 
-### 2. Configurar variables de entorno
-
-```bash
+# 2. Variables de entorno
 cp .env.example .env
-```
+# Editar .env: cambiar JWT_SECRET por una clave de 32+ caracteres
 
-Edita `.env` y ajusta `JWT_SECRET` con una clave segura de al menos 32 caracteres.
-
-### 3. Levantar PostgreSQL con Docker
-
-```bash
+# 3. PostgreSQL
 docker-compose up -d
-```
 
-Esto inicia PostgreSQL 16 en el puerto 5432 con las credenciales del `.env`.
-
-### 4. Instalar dependencias
-
-```bash
+# 4. Instalar dependencias
 npm install
-```
 
-### 5. Ejecutar migraciones de base de datos
+# 5. Generar Prisma Client
+cd server && npx prisma generate && cd ..
 
-```bash
+# 6. Migraciones
 npm run db:migrate
-```
 
-### 6. Poblar datos iniciales (seed)
-
-```bash
+# 7. Seed (datos de prueba)
 npm run db:seed
-```
 
-Esto crea:
-- Admin: `admin@piqueralink.com` / `admin123`
-- Conductor: `conductor@piqueralink.com` / `driver123`
-- Pasajero: `pasajero@piqueralink.com` / `pasajero123`
-- Piquera Central (ID: `00000000-0000-0000-0000-000000000001`)
-
-### 7. Iniciar en desarrollo
-
-```bash
+# 8. Iniciar (server + client)
 npm run dev
 ```
 
-Esto levanta simultáneamente:
-- **Backend** en `http://localhost:3000`
-- **Frontend** en `http://localhost:5173`
+**URLs:**
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3000
+- Health check: http://localhost:3000/api/health
+
+### Usuarios de prueba (seed)
+
+| Rol | Email | Contraseña |
+|-----|-------|------------|
+| Super Admin | superadmin@piqueralink.com | super123 |
+| Admin | admin@piqueralink.com | admin123 |
+| Conductor | conductor@piqueralink.com | driver123 |
+| Pasajero | pasajero@piqueralink.com | pasajero123 |
+
+**Piquera de prueba:** ID `00000000-0000-0000-0000-000000000001` (Piquera Central)
 
 ---
 
-## 🧪 Guía de Pruebas
+## 📦 Módulos del Sistema
 
-### Flujo del Conductor
+### Modelos de Base de Datos (Prisma)
 
-1. Abre `http://localhost:5173`
-2. Inicia sesión con `conductor@piqueralink.com` / `driver123`
-3. Ingresa el ID de la piquera: `00000000-0000-0000-0000-000000000001`
-4. Haz clic en **"Unirse a la cola"**
-5. Verás tu posición actualizarse en tiempo real
-
-### Flujo del Pasajero
-
-1. Abre otra pestaña o navegador en `http://localhost:5173`
-2. Inicia sesión con `pasajero@piqueralink.com` / `pasajero123`
-3. Permite el acceso a tu ubicación cuando el navegador lo solicite
-4. Ingresa el ID de la piquera: `00000000-0000-0000-0000-000000000001`
-5. Escribe un destino (ej: "Centro Comercial")
-6. Haz clic en **"Solicitar Taxi"**
-7. Verás la información del conductor asignado (nombre, placa, modelo)
-
-### Flujo del Conductor (continuación)
-
-8. En la pestaña del conductor, aparecerá la alerta **"Nuevo viaje asignado"**
-9. Haz clic en **"Aceptar"**
-10. Luego en **"Completar Viaje"** cuando termine el servicio
-
-### Flujo del Administrador
-
-1. Inicia sesión con `admin@piqueralink.com` / `admin123`
-2. Ingresa el ID de la piquera y haz clic en **"Cargar"**
-3. Verás la fila virtual actualizarse en tiempo real cuando conductores se unen o salen
-
-### Verificar API directamente
-
-```bash
-# Health check
-curl http://localhost:3000/api/health
-
-# Login
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"conductor@piqueralink.com","password":"driver123"}'
-```
+| Modelo | Descripción |
+|--------|-------------|
+| User | Usuarios con 4 roles + accountStatus + rating |
+| Vehicle | Vehículos con múltiples fotos |
+| Piquera | Puntos de servicio con geolocalización |
+| Turn | Turnos FIFO con estados |
+| TripRequest | Viajes con tarifa, desglose y promo |
+| Incident | Incidencias registradas |
+| DriverLocation | GPS en tiempo real del conductor |
+| TrafficZone | Zonas de congestión con GeoJSON |
+| SOSAlert | Alertas de emergencia con resolución |
+| EmergencyContact | Contactos de emergencia |
+| Review | Calificaciones mutuas 1-5 |
+| FavoriteLocation | Destinos guardados del pasajero |
+| TripShareToken | Links temporales de seguimiento |
+| LostItem | Reportes de objetos perdidos |
+| Wallet | Billetera digital por usuario |
+| Transaction | Historial de movimientos financieros |
+| CommissionRule | Reglas de split de pagos |
+| PromoCode | Códigos de descuento |
+| PromoRedemption | Registro de uso de promos |
+| Notification | Notificaciones persistentes |
 
 ---
 
 ## 📡 API Endpoints
 
-### Autenticación (`/api/auth`)
+### Auth (`/api/auth`)
+| POST | `/register` | `/login` | `/refresh` |
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/register` | Registro con rol |
-| POST | `/login` | Login, retorna JWT |
-| POST | `/refresh` | Renovar token |
+### Queue (`/api/queue`)
+| POST `/join/:piqueraId` | DELETE `/leave/:piqueraId` | GET `/position/:piqueraId` | GET `/status/:piqueraId` |
 
-### Cola FIFO (`/api/queue`)
+### Trips (`/api/trips`)
+| POST `/request` | PATCH `/:id/accept` | PATCH `/:id/reject` | PATCH `/:id/complete` | GET `/:id/status` |
+| POST `/:id/share` | GET `/share/:token` (público) |
 
-| Método | Ruta | Rol | Descripción |
-|--------|------|-----|-------------|
-| POST | `/join/:piqueraId` | Conductor | Unirse a la cola |
-| DELETE | `/leave/:piqueraId` | Conductor | Abandonar cola |
-| GET | `/position/:piqueraId` | Conductor | Mi posición |
-| GET | `/status/:piqueraId` | Autenticado | Estado completo |
+### Fare (`/api/fare`)
+| POST `/estimate` |
 
-### Viajes (`/api/trips`)
+### Piqueras (`/api/piqueras`)
+| GET `/` | GET `/nearby` | GET `/nearest` | GET `/:id/metrics` |
 
-| Método | Ruta | Rol | Descripción |
-|--------|------|-----|-------------|
-| POST | `/request` | Pasajero | Solicitar viaje |
-| PATCH | `/:tripId/accept` | Conductor | Aceptar viaje |
-| PATCH | `/:tripId/reject` | Conductor | Rechazar viaje |
-| PATCH | `/:tripId/complete` | Conductor | Completar viaje |
-| GET | `/:tripId/status` | Ambos | Estado del viaje |
+### Wallet (`/api/wallet`)
+| GET `/summary` | GET `/transactions` | POST `/withdraw` |
+
+### SOS (`/api/sos`)
+| POST `/trigger` | GET `/active` | PATCH `/:id/acknowledge` | PATCH `/:id/resolve` | GET `/history` |
+
+### Ratings (`/api/ratings`)
+| POST `/` | GET `/me` | GET `/me/summary` | GET `/user/:id` | GET `/user/:id/summary` |
+
+### Favorites (`/api/favorites`)
+| GET `/` | POST `/` | PATCH `/:id` | DELETE `/:id` |
+
+### Lost Items (`/api/lost-items`)
+| POST `/` | GET `/me` | GET `/piquera/:id` | PATCH `/:id/status` |
+
+### Promos (`/api/promos`)
+| POST `/validate` | POST `/` | GET `/` |
+
+### Notifications (`/api/notifications`)
+| GET `/` | PATCH `/:id/read` | PATCH `/read-all` |
+
+### Locations (`/api/locations`)
+| GET `/piquera/:id` | GET `/me` |
+
+### Driver Analytics (`/api/drivers`)
+| GET `/analytics` |
+
+### Global Admin (`/api/global-admin`)
+| GET `/overview` | GET `/piqueras` | GET `/piqueras/:id` |
+
+### Admin Tools (`/api/admin`)
+| GET `/reports/export` | GET `/users` | PATCH `/users/:id/status` |
+
+### Metrics (`/api/admin/metrics`)
+| GET `/global` |
 
 ---
 
@@ -288,27 +307,86 @@ curl -X POST http://localhost:3000/api/auth/login \
 |--------|------|-------------|
 | `queue:state_changed` | `piquera:{id}` | Cola actualizada |
 | `queue:position_update` | `piquera:{id}` | Cambio de posición |
-| `trip:assigned` | `user:{driverId}` | Viaje asignado al conductor |
-| `trip:driver_info` | `user:{passengerId}` | Info del conductor para el pasajero |
-| `trip:status_changed` | `trip:{tripId}` | Cambio de estado del viaje |
+| `trip:assigned` | `user:{driverId}` | Viaje asignado |
+| `trip:driver_info` | `user:{passengerId}` | Info del conductor |
+| `trip:status_changed` | `trip:{id}` | Cambio de estado |
+| `location:update` | (entrada) | Conductor envía GPS |
+| `location:driver_moved` | `piquera:{id}` | Posición del conductor |
+| `sos:triggered` | `admins` | Alerta de emergencia |
+| `sos:location_update` | `admins` | Streaming ubicación SOS |
+| `sos:resolved` | `admins` | Alerta cerrada |
+| `lost_item:reported` | `user:{driverId}` | Objeto perdido reportado |
+| `notification:new` | `user:{id}` | Nueva notificación |
+
+**Rooms disponibles:** `piquera:{id}`, `user:{id}`, `trip:{id}`, `admins`
+
+---
+
+## 🧪 Guía de Pruebas
+
+### Flujo completo del viaje
+
+1. **Login conductor** → `conductor@piqueralink.com`
+2. **Unirse a cola** → ID: `00000000-0000-0000-0000-000000000001`
+3. **Login pasajero** (otra pestaña) → `pasajero@piqueralink.com`
+4. **Solicitar taxi** → Se calcula tarifa dinámica → Se asigna conductor
+5. **Conductor acepta** → Pasajero ve nombre, placa, ETA
+6. **Conductor completa** → Wallet acreditada automáticamente con split
+
+### Probar SOS
+1. Login como pasajero → `POST /api/sos/trigger` con coordenadas
+2. Login como admin → Ve alerta en tiempo real vía Socket.IO
+
+### Probar tarifa dinámica
+```bash
+curl -X POST http://localhost:3000/api/fare/estimate \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"originLat": 19.43, "originLng": -99.13, "destinationLat": 19.45, "destinationLng": -99.15, "piqueraId": "00000000-0000-0000-0000-000000000001"}'
+```
 
 ---
 
 ## 🔒 Seguridad
 
-- **Cero secretos en el código:** Toda configuración sensible vive en `.env` (nunca se sube al repo).
-- **Validación con Zod:** Todas las entradas del usuario se validan antes de procesarse.
-- **Contraseñas hasheadas:** bcrypt con salt de 10 rondas.
-- **JWT stateless:** Tokens con expiración configurable.
-- **RBAC:** Cada endpoint verifica el rol del usuario antes de ejecutar.
-- **CORS configurado:** Solo el frontend autorizado puede comunicarse con el backend.
-- **Variables validadas al arrancar:** Si falta alguna env var, el servidor no inicia.
+- **Cero secretos en código** — Todo en `.env` (validado con Zod al arrancar)
+- **Contraseñas** — bcrypt con 10 rounds de salt
+- **JWT** — Tokens stateless con expiración configurable
+- **RBAC** — Cada endpoint verifica rol antes de ejecutar
+- **Account blocking** — Usuarios suspendidos/baneados son rechazados en cada request
+- **CORS** — Solo el frontend autorizado puede comunicarse
+- **Validación** — Zod en todas las entradas del usuario
+- **Safety links** — Tokens criptográficos con expiración de 4h
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Cola FIFO con transacciones ACID
+- [x] Asignación automática de conductores
+- [x] Socket.IO para tiempo real
+- [x] Geolocalización de pasajeros y conductores
+- [x] Tarificación dinámica (upfront pricing)
+- [x] Billetera digital con split de pagos
+- [x] Sistema SOS en tiempo real
+- [x] Calificaciones mutuas
+- [x] Compartir viaje (Safety Link)
+- [x] Códigos promocionales
+- [x] Notificaciones push
+- [x] Objetos perdidos
+- [x] Analítica del conductor
+- [x] Panel global super admin
+- [x] Reportes CSV + gestión de sanciones
+- [ ] Integración con pasarela de pagos real (Stripe/MercadoPago)
+- [ ] App móvil nativa (React Native)
+- [ ] Machine Learning para predicción de demanda
+- [ ] Motor de asignación geoespacial avanzado
 
 ---
 
 ## 👥 Equipo
 
-Proyecto desarrollado para **Hackathon 2026** con el objetivo de digitalizar y modernizar el sistema tradicional de piqueras de taxis.
+Proyecto desarrollado para **Hackathon 2026** — Modernizando la movilidad urbana con tecnología accesible.
 
 ---
 
